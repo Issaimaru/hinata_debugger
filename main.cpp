@@ -1,10 +1,11 @@
+#include "CANFDMessage.h"
 #include "mbed.h"
 
 #include "ACAN2517FD.h"
 #include "CANSerialBridge.hpp"
 #include "MbedHardwareSPI.h"
 
-#include "mdc_client/MDCClient.hpp"
+//#include "mdc_client/MDCClient.hpp"
 
 using namespace acan2517fd;
 
@@ -29,7 +30,7 @@ MbedHardwareSPI dev_spi(spi, SPI_CS);
 ACAN2517FD dev_can(dev_spi, getMillisecond);
 CANSerialBridge serial(&dev_can);
 
-MDCClient mdc_client(&serial, 0);
+//MDCClient mdc_client(&serial, 0);
 
 InterruptIn canfd_int(SPI_INT);
 
@@ -63,9 +64,10 @@ int main() {
     printf("Initializing process completed.\n\r");
   } else {
     printf("Configuration error 0x%x\n\r", errorCode0);
+    return -1;
   }
 
-  setting_struct_t mdc_settings = {OperatorMode::NO_OPERATOR,
+  /*setting_struct_t mdc_settings = {OperatorMode::NO_OPERATOR,
                                    EncoderType::VELOCITY,
                                    1.0,
                                    false,
@@ -81,24 +83,42 @@ int main() {
     mdc_client.update_setting(0, mdc_settings);
     wait_us(1000 * 500);
   }
+  */
 
   while (true) {
-    if (getMillisecond() - gUpdateDate > 40) {
-      dev_can.poll();
-      serial.update();
-      if (mdc_client.update()) {
-        //  toggle led
-        acknowledge = !acknowledge;
-      }
+    CANFDMessage message;
+    message.id = 0x114 ;
+    message.len=1;
+    message.data[0] = 'A';
 
-      gUpdateDate = getMillisecond();
+    if (getMillisecond() - gUpdateDate > 40) {
+        dev_can.poll();
+        bool check = dev_can.tryToSend (message) ;
+        if(check){
+            printf("send!\n\r");
+            acknowledge = !acknowledge;
+        }
+        else printf("error!\n\r");
+
+        gUpdateDate = getMillisecond();
     }
 
-    if (getMillisecond() - gSentDate > 100) {
+    /*
+    if (getMillisecond() - gUpdateDate > 40) {
+        dev_can.poll();
+        if(dev_can.available()){
+            dev_can.receive(message);
+            printf("Message:%c\n\r",message.data[0]);
+            acknowledge = !acknowledge;
+        }
+    }   
+    */
+
+    /*if (getMillisecond() - gSentDate > 100) {
       //  send target values
       mdc_client.send_target();
 
       gSentDate = getMillisecond();
-    }
+    }*/
   }
 }
